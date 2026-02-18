@@ -129,19 +129,16 @@ const App = () => {
 
   useEffect(() => {
     socket.on("receive_message", (message) => {
-      console.log("Received message:", message);
       setMessages((prev) => [...prev, message]);
     });
     socket.on("users", (usersData) => {
-      console.log("Received users:", usersData);
       setUsers(usersData);
     });
     socket.on("message_history", (history) => {
-      console.log("Received message history:", history);
       setMessages(history);
     });
     socket.on("connect", () => {
-      console.log("Socket connected:", socket.id);
+      // Socket connected
     });
     socket.on("join_success", () => {
       setIsConnected(true);

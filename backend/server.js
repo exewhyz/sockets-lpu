@@ -21,15 +21,10 @@ const io = new Server(server, {
   },
 });
 
-// Connect to MongoDB
-connectDB();
-
 // Map of online users: userName -> socketId
 const users = new Map();
 
 io.on("connection", (socket) => {
-  console.log("User connected", socket.id);
-
   socket.on("send_message", async (message) => {
     try {
       // Save message to database
@@ -37,7 +32,7 @@ io.on("connection", (socket) => {
         from: message.userName,
         to: message.to,
         message: message.data,
-        status: 'sent'
+        status: "sent",
       });
 
       const messageData = {
@@ -54,9 +49,9 @@ io.on("connection", (socket) => {
       if (recipientSocketId) {
         io.to(recipientSocketId).emit("receive_message", messageData);
         // Update status to delivered
-        newMessage.status = 'delivered';
+        newMessage.status = "delivered";
         await newMessage.save();
-        messageData.status = 'delivered';
+        messageData.status = "delivered";
         // Notify sender about delivery
         socket.emit("message_delivered", { messageId: messageData.id });
       }
@@ -68,7 +63,7 @@ io.on("connection", (socket) => {
       socket.emit("error", { message: "Failed to send message" });
     }
   });
-  
+
   socket.on("join", async ({ userName, password }) => {
     try {
       // Validate input
@@ -81,7 +76,7 @@ io.on("connection", (socket) => {
 
       // Find user in database
       let user = await User.findOne({ name: userName });
-      
+
       if (user) {
         // Check if user has no password (created before password feature)
         if (!user.password) {
@@ -94,14 +89,14 @@ io.on("connection", (socket) => {
         } else {
           // Existing user with password - verify it
           const isPasswordValid = await user.comparePassword(password);
-          
+
           if (!isPasswordValid) {
             socket.emit("join_error", {
               message: "Incorrect password.",
             });
             return;
           }
-          
+
           // Check if user is already online (in another session)
           if (user.online && users.has(userName)) {
             socket.emit("join_error", {
@@ -109,7 +104,7 @@ io.on("connection", (socket) => {
             });
             return;
           }
-          
+
           // Update existing user (successful login)
           user.socketId = socket.id;
           user.online = true;
@@ -123,7 +118,7 @@ io.on("connection", (socket) => {
           password: password,
           socketId: socket.id,
           online: true,
-          lastSeen: new Date()
+          lastSeen: new Date(),
         });
       }
 
@@ -131,7 +126,7 @@ io.on("connection", (socket) => {
       socket.userName = userName;
 
       socket.emit("join_success");
-      
+
       // Get all users from database
       const allUsers = await User.find({}).lean();
       const userList = allUsers.map((u) => ({
@@ -139,15 +134,12 @@ io.on("connection", (socket) => {
         online: u.online,
         lastSeen: u.lastSeen,
       }));
-      
+
       io.emit("users", userList);
-      
+
       // Get message history
       const messageHistory = await Message.find({
-        $or: [
-          { from: userName },
-          { to: userName }
-        ]
+        $or: [{ from: userName }, { to: userName }],
       })
         .sort({ createdAt: 1 })
         .lean();
@@ -162,21 +154,23 @@ io.on("connection", (socket) => {
       }));
 
       socket.emit("message_history", formattedMessages);
-      
+
       // Mark undelivered messages as delivered
       const undeliveredMessages = await Message.find({
         to: userName,
-        status: 'sent'
+        status: "sent",
       });
-      
+
       for (const msg of undeliveredMessages) {
-        msg.status = 'delivered';
+        msg.status = "delivered";
         await msg.save();
-        
+
         // Notify original sender
         const senderSocketId = users.get(msg.from);
         if (senderSocketId) {
-          io.to(senderSocketId).emit("message_delivered", { messageId: msg._id.toString() });
+          io.to(senderSocketId).emit("message_delivered", {
+            messageId: msg._id.toString(),
+          });
         }
       }
     } catch (error) {
@@ -189,18 +183,18 @@ io.on("connection", (socket) => {
     try {
       // Update message status to read
       const result = await Message.updateMany(
-        { from, to, status: { $ne: 'read' } },
-        { status: 'read' }
+        { from, to, status: { $ne: "read" } },
+        { status: "read" },
       );
 
       if (result.modifiedCount > 0) {
         // Get updated message IDs
-        const updatedMessages = await Message.find(
-          { from, to, status: 'read' }
-        ).select('_id').lean();
-        
-        const messageIds = updatedMessages.map(m => m._id.toString());
-        
+        const updatedMessages = await Message.find({ from, to, status: "read" })
+          .select("_id")
+          .lean();
+
+        const messageIds = updatedMessages.map((m) => m._id.toString());
+
         // Notify sender that messages were read
         const senderSocketId = users.get(from);
         if (senderSocketId) {
@@ -230,18 +224,17 @@ io.on("connection", (socket) => {
     if (socket.userName) {
       try {
         users.delete(socket.userName);
-        console.log("User left:", socket.userName);
-        
+
         // Update user status in database
         await User.findOneAndUpdate(
           { name: socket.userName },
           {
             online: false,
             lastSeen: new Date(),
-            socketId: null
-          }
+            socketId: null,
+          },
         );
-        
+
         // Send updated user list
         const allUsers = await User.find({}).lean();
         const userList = allUsers.map((u) => ({
@@ -250,7 +243,7 @@ io.on("connection", (socket) => {
           lastSeen: u.lastSeen,
         }));
         io.emit("users", userList);
-        
+
         socket.userName = null;
       } catch (error) {
         console.error("Error in leave event:", error);
@@ -262,18 +255,17 @@ io.on("connection", (socket) => {
     if (socket.userName) {
       try {
         users.delete(socket.userName);
-        console.log("User disconnected:", socket.userName);
-        
+
         // Update user status in database
         await User.findOneAndUpdate(
           { name: socket.userName },
           {
             online: false,
             lastSeen: new Date(),
-            socketId: null
-          }
+            socketId: null,
+          },
         );
-        
+
         // Send updated user list
         const allUsers = await User.find({}).lean();
         const userList = allUsers.map((u) => ({
@@ -295,13 +287,15 @@ app.get("/", (req, res) => {
 
 // Health check endpoint
 app.get("/health", async (req, res) => {
-  const mongoose = (await import('mongoose')).default;
-  res.json({ 
-    status: "ok", 
-    mongodb: mongoose.connection.readyState === 1 ? "connected" : "disconnected" 
+  const mongoose = (await import("mongoose")).default;
+  res.json({
+    status: "ok",
+    mongodb:
+      mongoose.connection.readyState === 1 ? "connected" : "disconnected",
   });
 });
 
-server.listen(PORT, () =>
-  console.log(`Server listening on  http://localhost:${PORT}`),
-);
+server.listen(PORT, async () => {
+  await connectDB();
+  console.log(`Server listening on  http://localhost:${PORT}`);
+});
