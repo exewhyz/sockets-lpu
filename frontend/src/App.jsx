@@ -11,7 +11,6 @@ import {
 } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Badge } from "@/components/ui/badge";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -22,7 +21,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Send, MessageCircle, Menu, LogOut } from "lucide-react";
+import { Send, MessageCircle, LogOut } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -58,6 +57,10 @@ const App = () => {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [selectedUser]);
 
   useEffect(() => {
     socket.on("receive_message", (message) => {
@@ -98,6 +101,12 @@ const App = () => {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!userName) return;
+
+    // Reconnect socket if it was disconnected
+    if (!socket.connected) {
+      socket.connect();
+    }
+
     socket.emit("join", userName);
     setIsConnected(true);
   };
@@ -110,6 +119,8 @@ const App = () => {
   };
 
   const handleDisconnect = () => {
+    // Emit leave event before disconnecting
+    socket.emit("leave");
     socket.disconnect();
     setIsConnected(false);
     setUserName("");
@@ -120,10 +131,10 @@ const App = () => {
   };
 
   return (
-    <div className="h-screen w-screen overflow-hidden bg-gradient-to-br from-sky-50 via-cyan-50 to-blue-50 dark:from-gray-900 dark:via-sky-950 dark:to-cyan-950">
+    <div className="h-screen w-screen overflow-hidden bg-linear-to-br from-sky-50 via-cyan-50 to-blue-50 dark:from-gray-900 dark:via-sky-950 dark:to-cyan-950">
       {!isConnected ? (
         <div className="flex items-center justify-center h-full w-full p-4">
-          <Card className="w-full max-w-md shadow-2xl border-2 border-sky-200 dark:border-sky-900 bg-gradient-to-br from-white to-sky-50 dark:from-gray-900 dark:to-sky-950">
+          <Card className="w-full max-w-md shadow-2xl border-2 border-sky-200 dark:border-sky-900 bg-linear-to-br from-white to-sky-50 dark:from-gray-900 dark:to-sky-950">
             <CardHeader className="text-center space-y-2">
               <div className="flex justify-center mb-2">
                 <MessageCircle className="h-16 w-16 text-primary" />
@@ -160,11 +171,11 @@ const App = () => {
           </Card>
         </div>
       ) : (
-        <SidebarProvider defaultOpen={true}>
+        <SidebarProvider defaultOpen={true} className="h-full">
           {/* <div className="flex h-full w-full bg-background"> */}
           {/* Sidebar */}
           <Sidebar collapsible="icon" variant="inset" className="border-r">
-            <SidebarHeader className="border-b bg-gradient-to-r from-sky-600 to-cyan-600 text-white">
+            <SidebarHeader className="border-b bg-linear-to-r from-sky-600 to-cyan-600 text-white">
               <div className="flex items-center gap-2 px-2 py-2">
                 <MessageCircle className="h-5 w-5" />
                 <span className="font-semibold text-lg group-data-[collapsible=icon]:hidden">
@@ -195,7 +206,7 @@ const App = () => {
                               tooltip={user}
                             >
                               <Avatar className="h-9 w-9 shrink-0">
-                                <AvatarFallback className="bg-gradient-to-br from-sky-500 to-cyan-500 text-white font-semibold text-sm">
+                                <AvatarFallback className="bg-linear-to-br from-sky-500 to-cyan-500 text-white font-semibold text-sm">
                                   {user.charAt(0).toUpperCase()}
                                 </AvatarFallback>
                               </Avatar>
@@ -215,7 +226,7 @@ const App = () => {
                 </SidebarGroupContent>
               </SidebarGroup>
             </SidebarContent>
-            <SidebarFooter className="border-t bg-gradient-to-r from-sky-50 to-cyan-50 dark:from-gray-800 dark:to-sky-900 p-4">
+            <SidebarFooter className="border-t bg-linear-to-r from-sky-50 to-cyan-50 dark:from-gray-800 dark:to-sky-900 p-4">
               <SidebarMenu>
                 <SidebarMenuItem>
                   <SidebarMenuButton
@@ -224,7 +235,7 @@ const App = () => {
                     tooltip="Disconnect"
                   >
                     <Avatar className="h-9 w-9 shrink-0 group-data-[collapsible=icon]:hidden">
-                      <AvatarFallback className="bg-gradient-to-br from-cyan-600 to-sky-600 text-white font-semibold text-sm">
+                      <AvatarFallback className="bg-linear-to-br from-cyan-600 to-sky-600 text-white font-semibold text-sm">
                         {userName.charAt(0).toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
@@ -243,15 +254,15 @@ const App = () => {
             <SidebarRail />
           </Sidebar>
           {/* Main Chat Area */}
-          <SidebarInset className="flex flex-col h-screen overflow-hidden">
+          <SidebarInset>
             {selectedUser ? (
               <>
                 {/* Chat Header */}
-                <header className="flex h-16 shrink-0 items-center gap-2 border-b bg-gradient-to-r from-white to-sky-50 dark:from-gray-900 dark:to-sky-950 px-4">
+                <header className="flex h-16 shrink-0 items-center gap-2 border-b bg-linear-to-r from-white to-sky-50 dark:from-gray-900 dark:to-sky-950 px-4">
                   <SidebarTrigger />
                   <div className="flex items-center gap-3 flex-1">
                     <Avatar className="h-10 w-10">
-                      <AvatarFallback className="bg-gradient-to-br from-sky-500 to-cyan-500 text-white font-semibold">
+                      <AvatarFallback className="bg-linear-to-br from-sky-500 to-cyan-500 text-white font-semibold">
                         {selectedUser.charAt(0).toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
@@ -265,7 +276,7 @@ const App = () => {
                 </header>
 
                 {/* Messages Area */}
-                <div className="flex-1 overflow-hidden bg-gradient-to-b from-sky-50/50 to-cyan-50/30 dark:from-gray-900 dark:to-sky-950/30">
+                <div className="flex-1 overflow-hidden bg-linear-to-b from-sky-50/50 to-cyan-50/30 dark:from-gray-900 dark:to-sky-950/30">
                   <ScrollArea className="h-full">
                     <div className="p-4 space-y-4">
                       {messages
@@ -287,7 +298,7 @@ const App = () => {
                             <div
                               className={`max-w-[70%] rounded-2xl px-4 py-2.5 shadow-md ${
                                 msg.from === userName
-                                  ? "bg-gradient-to-br from-sky-500 to-cyan-600 text-white rounded-br-sm"
+                                  ? "bg-linear-to-br from-sky-500 to-cyan-600 text-white rounded-br-sm"
                                   : "bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-bl-sm border border-sky-200 dark:border-sky-800"
                               }`}
                             >
@@ -326,7 +337,7 @@ const App = () => {
                       type="submit"
                       size="icon"
                       disabled={!messageText.trim()}
-                      className="h-11 w-11 shrink-0 bg-gradient-to-r from-sky-600 to-cyan-600 hover:from-sky-700 hover:to-cyan-700"
+                      className="h-11 w-11 shrink-0 bg-linear-to-r from-sky-600 to-cyan-600 hover:from-sky-700 hover:to-cyan-700"
                     >
                       <Send className="h-4 w-4" />
                     </Button>
@@ -334,19 +345,28 @@ const App = () => {
                 </div>
               </>
             ) : (
-              <div className="flex-1 flex items-center justify-center bg-gradient-to-b from-sky-50/50 to-cyan-50/30 dark:from-gray-900 dark:to-sky-950/30">
-                <div className="text-center text-muted-foreground space-y-4">
-                  <MessageCircle className="h-24 w-24 mx-auto opacity-20" />
-                  <div>
-                    <h3 className="text-xl font-semibold mb-2">
-                      No Conversation Selected
-                    </h3>
-                    <p className="text-sm">
-                      Select a user from the sidebar to start chatting
-                    </p>
+              <>
+                {/* Header with Sidebar Trigger */}
+                <header className="flex h-16 shrink-{/* 0 items-center gap-2 border-b bg-linear-to-r from-white to-sky-50 dark:from-gray-900 dark:to-sky-950 px-4">
+                  <SidebarTrigger />
+                  <h2 className="font-semibold text-lg text-muted-foreground">
+                    Chat App
+                  </h2>
+                </header>
+                <div className="flex-1 flex items-center justify-center bg-linear-to-b from-sky-50/50 to-cyan-50/30 dark:from-gray-900 dark:to-sky-950/30">
+                  <div className="text-center text-muted-foreground space-y-4">
+                    <MessageCircle className="h-24 w-24 mx-auto opacity-20" />
+                    <div>
+                      <h3 className="text-xl font-semibold mb-2">
+                        No Conversation Selected
+                      </h3>
+                      <p className="text-sm">
+                        Select a user from the sidebar to start chatting
+                      </p>
+                    </div>
                   </div>
                 </div>
-              </div>
+              </>
             )}
           </SidebarInset>
           {/* </div> */}
@@ -360,14 +380,14 @@ const App = () => {
                 <AlertDialogTitle>Disconnect from chat?</AlertDialogTitle>
                 <AlertDialogDescription>
                   You will be signed out and returned to the login screen. Your
-                  chat history will be lost.
+                  chat history might lost.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
                 <AlertDialogAction
                   onClick={handleDisconnect}
-                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  variant="destructive"
                 >
                   Disconnect
                 </AlertDialogAction>

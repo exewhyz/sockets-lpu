@@ -43,6 +43,16 @@ io.on("connection", (socket) => {
     io.emit("users", Array.from(users.keys()));
     socket.emit("message_history", messages);
   });
+  
+  socket.on("leave", () => {
+    if (socket.userName) {
+      users.delete(socket.userName);
+      console.log("User left:", socket.userName);
+      io.emit("users", Array.from(users.keys()));
+      socket.userName = null;
+    }
+  });
+  
   socket.on("disconnect", () => {
     if (socket.userName) {
       users.delete(socket.userName);
