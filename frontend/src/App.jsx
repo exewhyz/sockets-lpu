@@ -1,5 +1,6 @@
 import socket from "./utils/socket";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import "./App.css";
 
 const App = () => {
   const SEND_MESSAGE = "send_message";
@@ -9,6 +10,15 @@ const App = () => {
   const [userName, setUserName] = useState("");
   const [selectedUser, setSelectedUser] = useState("");
   const [messageText, setMessageText] = useState("");
+  const messagesEndRef = useRef(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
 
   useEffect(() => {
     socket.on("receive_message", (message) => {
@@ -55,67 +65,117 @@ const App = () => {
   };
 
   return (
-    <div>
-      {!isConnected && (
-        <form onSubmit={handleSubmit}>
-          <input
-            type="text"
-            value={userName}
-            onChange={(e) => setUserName(e.target.value)}
-            placeholder="Enter your name"
-            minLength={3}
-            required
-          />
-          <button>Join Chat</button>
-        </form>
-      )}
-
-      {isConnected && (
-        <>
-          <h3>Connected Users ({users.length}):</h3>
-          <p>{users.join(", ") || "No users connected"}</p>
-          
-          <h3>Select User to Message:</h3>
-          <select 
-            value={selectedUser} 
-            onChange={(e) => setSelectedUser(e.target.value)}
-          >
-            <option value="">-- Select a user --</option>
-            {users.filter(u => u !== userName).map((user) => (
-              <option key={user} value={user}>{user}</option>
-            ))}
-          </select>
-
-          <div style={{ marginTop: '20px' }}>
-            <h3>Messages:</h3>
-            {messages?.length === 0 ? (
-              <p>No messages</p>
-            ) : (
-              messages
-                ?.filter(msg => msg.from === userName || msg.to === userName)
-                .map((msg, idx) => (
-                  <div key={idx} style={{ padding: '5px', borderBottom: '1px solid #ccc' }}>
-                    <strong>{msg.from}</strong> → <strong>{msg.to}</strong>: {msg.message}
-                    <br />
-                    <small>{msg.time}</small>
+    <div className="app-container">
+      {!isConnected ? (
+        <div className="login-container">
+          <div className="login-card">
+            <h1>💬 Chat App</h1>
+            <p>Enter your name to start chatting</p>
+            <form onSubmit={handleSubmit}>
+              <input
+                type="text"
+                value={userName}
+                onChange={(e) => setUserName(e.target.value)}
+                placeholder="Your name"
+                minLength={3}
+                required
+                className="login-input"
+              />
+              <button type="submit" className="login-button">Join Chat</button>
+            </form>
+          </div>
+        </div>
+      ) : (
+        <div className="chat-container">
+          <div className="sidebar">
+            <div className="sidebar-header">
+              <h2>💬 Chats</h2>
+              <div className="current-user">
+                <span className="user-badge">{userName}</span>
+              </div>
+            </div>
+            <div className="users-list">
+              {users.filter(u => u !== userName).length === 0 ? (
+                <div className="no-users">No other users online</div>
+              ) : (
+                users.filter(u => u !== userName).map((user) => (
+                  <div 
+                    key={user}
+                    className={`user-item ${selectedUser === user ? 'active' : ''}`}
+                    onClick={() => setSelectedUser(user)}
+                  >
+                    <div className="user-avatar">{user.charAt(0).toUpperCase()}</div>
+                    <div className="user-info">
+                      <div className="user-name">{user}</div>
+                      <div className="user-status">Online</div>
+                    </div>
                   </div>
                 ))
-            )}
+              )}
+            </div>
           </div>
 
-          <div style={{ marginTop: '20px' }}>
-            <input
-              type="text"
-              value={messageText}
-              onChange={(e) => setMessageText(e.target.value)}
-              placeholder="Type your message"
-              onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
-            />
-            <button onClick={sendMessage} disabled={!selectedUser || !messageText.trim()}>
-              Send Message
-            </button>
+          <div className="chat-area">
+            {selectedUser ? (
+              <>
+                <div className="chat-header">
+                  <div className="chat-header-user">
+                    <div className="user-avatar">{selectedUser.charAt(0).toUpperCase()}</div>
+                    <div>
+                      <div className="chat-title">{selectedUser}</div>
+                      <div className="chat-status">Online</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="messages-container">
+                  {messages
+                    .filter(msg => 
+                      (msg.from === userName && msg.to === selectedUser) ||
+                      (msg.from === selectedUser && msg.to === userName)
+                    )
+                    .map((msg, idx) => (
+                      <div 
+                        key={idx} 
+                        className={`message ${msg.from === userName ? 'sent' : 'received'}`}
+                      >
+                        <div className="message-bubble">
+                          <div className="message-text">{msg.message}</div>
+                          <div className="message-time">{msg.time}</div>
+                        </div>
+                      </div>
+                    ))}
+                  <div ref={messagesEndRef} />
+                </div>
+
+                <div className="message-input-container">
+                  <input
+                    type="text"
+                    value={messageText}
+                    onChange={(e) => setMessageText(e.target.value)}
+                    placeholder={`Message ${selectedUser}...`}
+                    onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage()}
+                    className="message-input"
+                  />
+                  <button 
+                    onClick={sendMessage} 
+                    disabled={!messageText.trim()}
+                    className="send-button"
+                  >
+                    📤
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div className="no-chat-selected">
+                <div className="no-chat-content">
+                  <h2>💬</h2>
+                  <p>Select a user to start chatting</p>
+                </div>
+              </div>
+            )}
           </div>
-        </>
+        </div>
       )}
     </div>
   );
