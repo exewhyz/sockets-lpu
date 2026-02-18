@@ -21,7 +21,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Send, MessageCircle, LogOut } from "lucide-react";
+import { Send, MessageCircle, LogOut, Check } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -52,6 +52,51 @@ const App = () => {
   const messagesEndRef = useRef(null);
   const typingTimeoutRef = useRef(null);
 
+  // Helper function to format last seen time
+  const formatLastSeen = (lastSeenISO) => {
+    if (!lastSeenISO) return "";
+    const now = new Date();
+    const lastSeen = new Date(lastSeenISO);
+    const diffMs = now - lastSeen;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return "Just now";
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return lastSeen.toLocaleDateString();
+  };
+
+  // Helper function to render message status ticks
+  const renderMessageTicks = (status) => {
+    if (status === "sent") {
+      // Single gray tick
+      return <Check className="w-3 h-3 inline-block ml-1" />;
+    } else if (status === "delivered") {
+      // Double gray ticks
+      return (
+        <span className="inline-flex ml-1">
+          <Check className="w-3 h-3 -mr-1.5" />
+          <Check className="w-3 h-3" />
+        </span>
+      );
+    } else if (status === "read") {
+      // Double blue ticks
+      return (
+        <span className="inline-flex ml-1 text-red-700">
+          <Check className="w-3 h-3 -mr-1.5" />
+          <Check className="w-3 h-3" />
+        </span>
+      );
+    }
+    return null;
+  };
+
+  // Get selected user object
+  const selectedUserObj = users.find((u) => u.name === selectedUser);
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
@@ -60,6 +105,13 @@ const App = () => {
     scrollToBottom();
   }, [messages]);
 
+  // Mark messages as read when new messages arrive in current conversation
+  useEffect(() => {
+    if (selectedUser && isConnected) {
+      socket.emit("messages_read", { from: selectedUser, to: userName });
+    }
+  }, [messages, selectedUser, userName, isConnected]);
+
   useEffect(() => {
     scrollToBottom();
     // Clear typing timeout when switching users
@@ -67,7 +119,12 @@ const App = () => {
       clearTimeout(typingTimeoutRef.current);
       typingTimeoutRef.current = null;
     }
-  }, [selectedUser]);
+    
+    // Mark messages as read when viewing conversation
+    if (selectedUser && isConnected) {
+      socket.emit("messages_read", { from: selectedUser, to: userName });
+    }
+  }, [selectedUser, userName, isConnected]);
 
   useEffect(() => {
     socket.on("receive_message", (message) => {
@@ -103,6 +160,20 @@ const App = () => {
         return newSet;
       });
     });
+    socket.on("message_delivered", ({ messageId }) => {
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === messageId ? { ...msg, status: "delivered" } : msg
+        )
+      );
+    });
+    socket.on("messages_read", ({ messageIds }) => {
+      setMessages((prev) =>
+        prev.map((msg) =>
+          messageIds.includes(msg.id) ? { ...msg, status: "read" } : msg
+        )
+      );
+    });
 
     return () => {
       socket.off("receive_message");
@@ -113,6 +184,8 @@ const App = () => {
       socket.off("join_error");
       socket.off("typing");
       socket.off("stop_typing");
+      socket.off("message_delivered");
+      socket.off("messages_read");
     };
   }, []);
 
@@ -255,46 +328,59 @@ const App = () => {
             <SidebarContent>
               <SidebarGroup>
                 <SidebarGroupLabel className="group-data-[collapsible=icon]:hidden">
-                  Online Users
+                  All Users
                 </SidebarGroupLabel>
                 <SidebarGroupContent>
                   <SidebarMenu>
-                    {users.filter((u) => u !== userName).length === 0 ? (
+                    {users.filter((u) => u.name !== userName).length === 0 ? (
                       <div className="p-4 text-center text-muted-foreground text-sm group-data-[collapsible=icon]:hidden">
-                        No other users online
+                        No other users
                       </div>
                     ) : (
                       users
-                        .filter((u) => u !== userName)
+                        .filter((u) => u.name !== userName)
                         .map((user) => (
-                          <SidebarMenuItem key={user}>
+                          <SidebarMenuItem key={user.name}>
                             <SidebarMenuButton
-                              onClick={() => setSelectedUser(user)}
-                              isActive={selectedUser === user}
+                              onClick={() => setSelectedUser(user.name)}
+                              isActive={selectedUser === user.name}
                               className="h-auto py-3 group-data-[collapsible=icon]:justify-center"
-                              tooltip={user}
+                              tooltip={user.name}
                             >
-                              <Avatar className="h-9 w-9 shrink-0">
-                                <AvatarFallback className="bg-linear-to-br from-sky-500 to-cyan-500 text-white font-semibold text-sm">
-                                  {user.charAt(0).toUpperCase()}
+                              <Avatar className="h-9 w-9 shrink-0 relative">
+                                <AvatarFallback className={`${
+                                  user.online
+                                    ? "bg-linear-to-br from-sky-500 to-cyan-500"
+                                    : "bg-linear-to-br from-gray-400 to-gray-500"
+                                } text-white font-semibold text-sm`}>
+                                  {user.name.charAt(0).toUpperCase()}
                                 </AvatarFallback>
+                                {user.online && (
+                                  <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 border-2 border-white dark:border-gray-800 rounded-full"></span>
+                                )}
                               </Avatar>
                               <div className="flex flex-col items-start group-data-[collapsible=icon]:hidden">
                                 <span className="font-semibold text-sm">
-                                  {user}
+                                  {user.name}
                                 </span>
-                                {typingUsers.has(user) ? (
-                                  <span className="text-xs text-sky-600 dark:text-sky-400 font-medium flex items-center gap-1">
-                                    typing
-                                    <span className="flex gap-0.5">
-                                      <span className="w-1 h-1 bg-sky-600 dark:bg-sky-400 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
-                                      <span className="w-1 h-1 bg-sky-600 dark:bg-sky-400 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
-                                      <span className="w-1 h-1 bg-sky-600 dark:bg-sky-400 rounded-full animate-bounce"></span>
+                                {user.online ? (
+                                  typingUsers.has(user.name) ? (
+                                    <span className="text-xs text-sky-600 dark:text-sky-400 font-medium flex items-center gap-1">
+                                      typing
+                                      <span className="flex gap-0.5">
+                                        <span className="w-1 h-1 bg-sky-600 dark:bg-sky-400 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+                                        <span className="w-1 h-1 bg-sky-600 dark:bg-sky-400 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+                                        <span className="w-1 h-1 bg-sky-600 dark:bg-sky-400 rounded-full animate-bounce"></span>
+                                      </span>
                                     </span>
-                                  </span>
+                                  ) : (
+                                    <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+                                      ● Online
+                                    </span>
+                                  )
                                 ) : (
-                                  <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
-                                    ● Online
+                                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                                    {formatLastSeen(user.lastSeen)}
                                   </span>
                                 )}
                               </div>
@@ -341,25 +427,38 @@ const App = () => {
                 <header className="flex h-16 shrink-0 items-center gap-2 border-b bg-linear-to-r from-white to-sky-50 dark:from-gray-900 dark:to-sky-950 px-4">
                   <SidebarTrigger />
                   <div className="flex items-center gap-3 flex-1">
-                    <Avatar className="h-10 w-10">
-                      <AvatarFallback className="bg-linear-to-br from-sky-500 to-cyan-500 text-white font-semibold">
+                    <Avatar className="h-10 w-10 relative">
+                      <AvatarFallback className={`${
+                        selectedUserObj?.online
+                          ? "bg-linear-to-br from-sky-500 to-cyan-500"
+                          : "bg-linear-to-br from-gray-400 to-gray-500"
+                      } text-white font-semibold`}>
                         {selectedUser.charAt(0).toUpperCase()}
                       </AvatarFallback>
+                      {selectedUserObj?.online && (
+                        <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 border-2 border-white dark:border-gray-800 rounded-full"></span>
+                      )}
                     </Avatar>
                     <div>
                       <h2 className="font-semibold text-lg">{selectedUser}</h2>
-                      {typingUsers.has(selectedUser) ? (
-                        <p className="text-xs text-sky-600 dark:text-sky-400 font-medium flex items-center gap-1">
-                          typing
-                          <span className="flex gap-0.5">
-                            <span className="w-1 h-1 bg-sky-600 dark:bg-sky-400 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
-                            <span className="w-1 h-1 bg-sky-600 dark:bg-sky-400 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
-                            <span className="w-1 h-1 bg-sky-600 dark:bg-sky-400 rounded-full animate-bounce"></span>
-                          </span>
-                        </p>
+                      {selectedUserObj?.online ? (
+                        typingUsers.has(selectedUser) ? (
+                          <p className="text-xs text-sky-600 dark:text-sky-400 font-medium flex items-center gap-1">
+                            typing
+                            <span className="flex gap-0.5">
+                              <span className="w-1 h-1 bg-sky-600 dark:bg-sky-400 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+                              <span className="w-1 h-1 bg-sky-600 dark:bg-sky-400 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+                              <span className="w-1 h-1 bg-sky-600 dark:bg-sky-400 rounded-full animate-bounce"></span>
+                            </span>
+                          </p>
+                        ) : (
+                          <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+                            ● Online
+                          </p>
+                        )
                       ) : (
-                        <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
-                          ● Online
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          {formatLastSeen(selectedUserObj?.lastSeen)}
                         </p>
                       )}
                     </div>
@@ -396,19 +495,17 @@ const App = () => {
                               <p className="text-sm wrap-break-word leading-relaxed">
                                 {msg.message}
                               </p>
-                              <p className="text-[0.65rem] opacity-70 mt-1 text-right">
-                                {msg.time}
+                              <p className="text-[0.65rem] opacity-70 mt-1 text-right flex items-center justify-end gap-1">
+                                <span>{msg.time}</span>
+                                {msg.from === userName && renderMessageTicks(msg.status)}
                               </p>
                             </div>
                           </div>
                         ))}
-                      {typingUsers.has(selectedUser) && (
+                      {typingUsers.has(selectedUser) && selectedUserObj?.online && (
                         <div className="flex justify-start animate-in fade-in duration-200">
                           <div className="bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 rounded-2xl px-4 py-3 shadow-md border border-sky-200 dark:border-sky-800 rounded-bl-sm">
                             <div className="flex items-center gap-1">
-                              {/* <span className="text-sm font-medium">
-                                {selectedUser} is typing
-                              </span> */}
                               <div className="flex gap-1 ml-1">
                                 <div className="size-1 bg-sky-500 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
                                 <div className="size-1 bg-sky-500 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
@@ -425,6 +522,11 @@ const App = () => {
 
                 {/* Message Input */}
                 <div className="shrink-0 border-t bg-white dark:bg-gray-900 p-4">
+                  {!selectedUserObj?.online && (
+                    <div className="mb-2 text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded px-3 py-2">
+                      {selectedUser} is offline. Your message will be delivered when they come online.
+                    </div>
+                  )}
                   <form
                     onSubmit={(e) => {
                       e.preventDefault();
