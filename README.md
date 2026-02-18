@@ -286,6 +286,89 @@ This project is licensed under the ISC License.
 - Tailwind CSS for styling utilities
 - MongoDB for database management
 
+## Deployment
+
+### Backend Deployment
+
+⚠️ **Important:** Vercel doesn't support persistent WebSocket connections required by Socket.io. Use one of these platforms instead:
+
+#### Render (Recommended - Free Tier Available)
+
+1. Create account at [render.com](https://render.com)
+2. Click "New +" → "Web Service"
+3. Connect your GitHub repository
+4. Render will auto-detect the `render.yaml` configuration
+5. Add environment variable: `MONGODB_URI`
+6. Click "Create Web Service"
+7. Copy the deployed URL (e.g., `https://your-app.onrender.com`)
+
+#### Railway
+
+1. Create account at [railway.app](https://railway.app)
+2. Click "New Project" → "Deploy from GitHub repo"
+3. Select your repository and the `backend` folder
+4. Add environment variables: `PORT`, `MONGODB_URI`
+5. Deploy and copy the URL
+
+#### Alternative: DigitalOcean, Heroku, AWS, Azure, GCP
+
+All support Node.js and WebSocket connections.
+
+### Frontend Deployment (Vercel/Netlify)
+
+Frontend can be deployed to Vercel or Netlify:
+
+**Vercel:**
+```bash
+cd frontend
+npm run build
+vercel --prod
+```
+
+**Netlify:**
+```bash
+cd frontend
+npm run build
+netlify deploy --prod --dir=dist
+```
+
+### Environment Variables for Production
+
+**Backend:**
+- `PORT` - Server port (usually provided by hosting platform)
+- `MONGODB_URI` - MongoDB connection string (use MongoDB Atlas for cloud)
+
+**Frontend:**
+- `VITE_BACKEND_URL` - Your deployed backend URL (e.g., `https://your-app.onrender.com`)
+
+### MongoDB Atlas Setup (for Production)
+
+1. Create account at [mongodb.com/cloud/atlas](https://www.mongodb.com/cloud/atlas)
+2. Create a free cluster
+3. Create database user with password
+4. Whitelist all IPs: `0.0.0.0/0` (Network Access)
+5. Get connection string and add to backend env vars
+
+## Troubleshooting Deployment
+
+### WebSocket Connection Failed on Vercel
+- **Issue:** Vercel doesn't support persistent WebSocket connections
+- **Solution:** Deploy backend to Render, Railway, or another WebSocket-compatible platform
+
+### CORS Errors
+- Ensure backend CORS is configured to accept your frontend domain
+- Update `origin: "*"` to `origin: "https://your-frontend.vercel.app"` for better security
+
+### MongoDB Connection Timeout
+- Use MongoDB Atlas for cloud deployments
+- Ensure IP whitelist includes `0.0.0.0/0` or your server's IP
+- Check connection string format and credentials
+
+### Environment Variables Not Working
+- Ensure `.env` files are added to Vercel/Render environment variables
+- Restart/redeploy after adding environment variables
+- Use correct prefix: `VITE_` for frontend variables
+
 ## Support
 
 For issues, questions, or contributions, please open an issue in the repository.
