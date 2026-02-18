@@ -48,7 +48,9 @@ const App = () => {
   const [selectedUser, setSelectedUser] = useState("");
   const [messageText, setMessageText] = useState("");
   const [showDisconnectDialog, setShowDisconnectDialog] = useState(false);
+  const [typingUsers, setTypingUsers] = useState(new Set());
   const messagesEndRef = useRef(null);
+  const typingTimeoutRef = useRef(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -60,6 +62,11 @@ const App = () => {
 
   useEffect(() => {
     scrollToBottom();
+    // Clear typing timeout when switching users
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = null;
+    }
   }, [selectedUser]);
 
   useEffect(() => {
@@ -86,6 +93,16 @@ const App = () => {
       setUserName("");
       socket.disconnect();
     });
+    socket.on("typing", ({ from }) => {
+      setTypingUsers((prev) => new Set(prev).add(from));
+    });
+    socket.on("stop_typing", ({ from }) => {
+      setTypingUsers((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(from);
+        return newSet;
+      });
+    });
 
     return () => {
       socket.off("receive_message");
@@ -94,11 +111,20 @@ const App = () => {
       socket.off("connect");
       socket.off("join_success");
       socket.off("join_error");
+      socket.off("typing");
+      socket.off("stop_typing");
     };
   }, []);
 
   const sendMessage = () => {
     if (!messageText.trim() || !selectedUser) return;
+
+    // Clear typing timeout and emit stop_typing
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = null;
+    }
+    socket.emit("stop_typing", { from: userName, to: selectedUser });
 
     socket.emit(SEND_MESSAGE, {
       userName,
@@ -127,7 +153,40 @@ const App = () => {
     }
   };
 
+  const handleTyping = (value) => {
+    setMessageText(value);
+
+    if (!selectedUser || !value.trim()) {
+      // Stop typing if no text or no user selected
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+        typingTimeoutRef.current = null;
+      }
+      socket.emit("stop_typing", { from: userName, to: selectedUser });
+      return;
+    }
+
+    // Emit typing event
+    socket.emit("typing", { from: userName, to: selectedUser });
+
+    // Clear previous timeout
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+
+    // Set new timeout to stop typing after 2 seconds of inactivity
+    typingTimeoutRef.current = setTimeout(() => {
+      socket.emit("stop_typing", { from: userName, to: selectedUser });
+      typingTimeoutRef.current = null;
+    }, 2000);
+  };
+
   const handleDisconnect = () => {
+    // Clear typing timeout
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = null;
+    }
     // Emit leave event before disconnecting
     socket.emit("leave");
     socket.disconnect();
@@ -136,6 +195,7 @@ const App = () => {
     setSelectedUser("");
     setMessages([]);
     setUsers([]);
+    setTypingUsers(new Set());
     setShowDisconnectDialog(false);
   };
 
@@ -223,9 +283,20 @@ const App = () => {
                                 <span className="font-semibold text-sm">
                                   {user}
                                 </span>
-                                <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
-                                  ● Online
-                                </span>
+                                {typingUsers.has(user) ? (
+                                  <span className="text-xs text-sky-600 dark:text-sky-400 font-medium flex items-center gap-1">
+                                    typing
+                                    <span className="flex gap-0.5">
+                                      <span className="w-1 h-1 bg-sky-600 dark:bg-sky-400 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+                                      <span className="w-1 h-1 bg-sky-600 dark:bg-sky-400 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+                                      <span className="w-1 h-1 bg-sky-600 dark:bg-sky-400 rounded-full animate-bounce"></span>
+                                    </span>
+                                  </span>
+                                ) : (
+                                  <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+                                    ● Online
+                                  </span>
+                                )}
                               </div>
                             </SidebarMenuButton>
                           </SidebarMenuItem>
@@ -277,9 +348,20 @@ const App = () => {
                     </Avatar>
                     <div>
                       <h2 className="font-semibold text-lg">{selectedUser}</h2>
-                      <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
-                        ● Online
-                      </p>
+                      {typingUsers.has(selectedUser) ? (
+                        <p className="text-xs text-sky-600 dark:text-sky-400 font-medium flex items-center gap-1">
+                          typing
+                          <span className="flex gap-0.5">
+                            <span className="w-1 h-1 bg-sky-600 dark:bg-sky-400 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+                            <span className="w-1 h-1 bg-sky-600 dark:bg-sky-400 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+                            <span className="w-1 h-1 bg-sky-600 dark:bg-sky-400 rounded-full animate-bounce"></span>
+                          </span>
+                        </p>
+                      ) : (
+                        <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+                          ● Online
+                        </p>
+                      )}
                     </div>
                   </div>
                 </header>
@@ -320,6 +402,22 @@ const App = () => {
                             </div>
                           </div>
                         ))}
+                      {typingUsers.has(selectedUser) && (
+                        <div className="flex justify-start animate-in fade-in duration-200">
+                          <div className="bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 rounded-2xl px-4 py-3 shadow-md border border-sky-200 dark:border-sky-800 rounded-bl-sm">
+                            <div className="flex items-center gap-1">
+                              {/* <span className="text-sm font-medium">
+                                {selectedUser} is typing
+                              </span> */}
+                              <div className="flex gap-1 ml-1">
+                                <div className="size-1 bg-sky-500 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+                                <div className="size-1 bg-sky-500 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+                                <div className="size-1 bg-sky-500 rounded-full animate-bounce"></div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                       <div ref={messagesEndRef} />
                     </div>
                   </ScrollArea>
@@ -337,7 +435,7 @@ const App = () => {
                     <Input
                       type="text"
                       value={messageText}
-                      onChange={(e) => setMessageText(e.target.value)}
+                      onChange={(e) => handleTyping(e.target.value)}
                       placeholder={`Message ${selectedUser}...`}
                       onKeyDown={handleKeyPress}
                       className="flex-1 h-11"
