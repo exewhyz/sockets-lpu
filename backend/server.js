@@ -13,14 +13,27 @@ const io = new Server(server, {
     origin: "*",
   },
 });
+const users = new Map();
 
 io.on("connection", (socket) => {
   console.log("User connected", socket.id);
 
   socket.on("send_message", (message) => {
-    io.emit("receive_message", message);
+    const newMessage = {
+      from : message.userName,
+      time: new Date(Date.now()).toLocaleString(),
+      message : message.data
+    }
+    io.to(socket.id).emit("receive_message", newMessage);
+  });
+  socket.on("join", (userName) => {
+    users.set(userName, socket.id);
+    io.emit("users", Array.from(users.keys()));
+  });
+  socket.on("disconnect", () => {
+    users.delete(socket.id);
+    io.emit("users", Array.from(users.keys()));
   })
-
 });
 
 app.get("/", (req, res) => {
