@@ -12,7 +12,17 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { Send, MessageCircle, Menu } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Send, MessageCircle, Menu, LogOut } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -20,6 +30,7 @@ import {
   SidebarGroupContent,
   SidebarGroupLabel,
   SidebarHeader,
+  SidebarFooter,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
@@ -37,6 +48,7 @@ const App = () => {
   const [userName, setUserName] = useState("");
   const [selectedUser, setSelectedUser] = useState("");
   const [messageText, setMessageText] = useState("");
+  const [showDisconnectDialog, setShowDisconnectDialog] = useState(false);
   const messagesEndRef = useRef(null);
 
   const scrollToBottom = () => {
@@ -97,6 +109,16 @@ const App = () => {
     }
   };
 
+  const handleDisconnect = () => {
+    socket.disconnect();
+    setIsConnected(false);
+    setUserName("");
+    setSelectedUser("");
+    setMessages([]);
+    setUsers([]);
+    setShowDisconnectDialog(false);
+  };
+
   return (
     <div className="h-screen w-screen overflow-hidden bg-linear-to-br from-primary/20 via-primary/10 to-accent/20">
       {!isConnected ? (
@@ -143,19 +165,11 @@ const App = () => {
           {/* Sidebar */}
           <Sidebar collapsible="icon" variant="inset" className="border-r">
             <SidebarHeader className="border-b bg-primary text-primary-foreground">
-              <div className="flex items-center justify-between px-2 py-2">
-                <div className="flex items-center gap-2">
-                  <MessageCircle className="h-5 w-5" />
-                  <span className="font-semibold text-lg group-data-[collapsible=icon]:hidden">
-                    Chats
-                  </span>
-                </div>
-                <Badge
-                  variant="secondary"
-                  className="bg-primary-foreground/20 text-primary-foreground hover:bg-primary-foreground/30 group-data-[collapsible=icon]:hidden"
-                >
-                  {userName}
-                </Badge>
+              <div className="flex items-center gap-2 px-2 py-2">
+                <MessageCircle className="h-5 w-5" />
+                <span className="font-semibold text-lg group-data-[collapsible=icon]:hidden">
+                  Chats
+                </span>
               </div>
             </SidebarHeader>
             <SidebarContent>
@@ -201,9 +215,33 @@ const App = () => {
                 </SidebarGroupContent>
               </SidebarGroup>
             </SidebarContent>
+            <SidebarFooter className="border-t bg-card p-4">
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    onClick={() => setShowDisconnectDialog(true)}
+                    className="h-11 hover:bg-destructive/10 group-data-[collapsible=icon]:justify-center"
+                    tooltip="Disconnect"
+                  >
+                    <Avatar className="h-9 w-9 shrink-0 group-data-[collapsible=icon]:hidden">
+                      <AvatarFallback className="bg-primary text-primary-foreground font-semibold text-sm">
+                        {userName.charAt(0).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <LogOut className="h-5 w-5 text-destructive hidden group-data-[collapsible=icon]:block" />
+                    <div className="flex flex-col items-start group-data-[collapsible=icon]:hidden">
+                      <span className="font-semibold text-sm">{userName}</span>
+                      <span className="text-xs text-muted-foreground">
+                        Click to disconnect
+                      </span>
+                    </div>
+                    <LogOut className="ml-auto h-4 w-4 text-destructive group-data-[collapsible=icon]:hidden" />
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarFooter>
             <SidebarRail />
           </Sidebar>
-
           {/* Main Chat Area */}
           <SidebarInset className="flex flex-col h-screen overflow-hidden">
             {selectedUser ? (
@@ -312,6 +350,30 @@ const App = () => {
             )}
           </SidebarInset>
           {/* </div> */}
+          {/* Disconnect Confirmation Dialog */}
+          <AlertDialog
+            open={showDisconnectDialog}
+            onOpenChange={setShowDisconnectDialog}
+          >
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Disconnect from chat?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  You will be signed out and returned to the login screen. Your
+                  chat history will be lost.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleDisconnect}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  Disconnect
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </SidebarProvider>
       )}
     </div>
