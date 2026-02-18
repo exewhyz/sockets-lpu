@@ -120,10 +120,10 @@ const App = () => {
   };
 
   return (
-    <div className="h-screen w-screen overflow-hidden bg-linear-to-br from-primary/20 via-primary/10 to-accent/20">
+    <div className="h-screen w-screen overflow-hidden bg-gradient-to-br from-sky-50 via-cyan-50 to-blue-50 dark:from-gray-900 dark:via-sky-950 dark:to-cyan-950">
       {!isConnected ? (
         <div className="flex items-center justify-center h-full w-full p-4">
-          <Card className="w-full max-w-md shadow-2xl">
+          <Card className="w-full max-w-md shadow-2xl border-2 border-sky-200 dark:border-sky-900 bg-gradient-to-br from-white to-sky-50 dark:from-gray-900 dark:to-sky-950">
             <CardHeader className="text-center space-y-2">
               <div className="flex justify-center mb-2">
                 <MessageCircle className="h-16 w-16 text-primary" />
@@ -164,7 +164,7 @@ const App = () => {
           {/* <div className="flex h-full w-full bg-background"> */}
           {/* Sidebar */}
           <Sidebar collapsible="icon" variant="inset" className="border-r">
-            <SidebarHeader className="border-b bg-primary text-primary-foreground">
+            <SidebarHeader className="border-b bg-gradient-to-r from-sky-600 to-cyan-600 text-white">
               <div className="flex items-center gap-2 px-2 py-2">
                 <MessageCircle className="h-5 w-5" />
                 <span className="font-semibold text-lg group-data-[collapsible=icon]:hidden">
@@ -195,7 +195,7 @@ const App = () => {
                               tooltip={user}
                             >
                               <Avatar className="h-9 w-9 shrink-0">
-                                <AvatarFallback className="bg-primary text-primary-foreground font-semibold text-sm">
+                                <AvatarFallback className="bg-gradient-to-br from-sky-500 to-cyan-500 text-white font-semibold text-sm">
                                   {user.charAt(0).toUpperCase()}
                                 </AvatarFallback>
                               </Avatar>
@@ -203,7 +203,7 @@ const App = () => {
                                 <span className="font-semibold text-sm">
                                   {user}
                                 </span>
-                                <span className="text-xs text-green-600 dark:text-green-500">
+                                <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
                                   ● Online
                                 </span>
                               </div>
@@ -215,7 +215,7 @@ const App = () => {
                 </SidebarGroupContent>
               </SidebarGroup>
             </SidebarContent>
-            <SidebarFooter className="border-t bg-card p-4">
+            <SidebarFooter className="border-t bg-gradient-to-r from-sky-50 to-cyan-50 dark:from-gray-800 dark:to-sky-900 p-4">
               <SidebarMenu>
                 <SidebarMenuItem>
                   <SidebarMenuButton
@@ -224,18 +224,18 @@ const App = () => {
                     tooltip="Disconnect"
                   >
                     <Avatar className="h-9 w-9 shrink-0 group-data-[collapsible=icon]:hidden">
-                      <AvatarFallback className="bg-primary text-primary-foreground font-semibold text-sm">
+                      <AvatarFallback className="bg-gradient-to-br from-cyan-600 to-sky-600 text-white font-semibold text-sm">
                         {userName.charAt(0).toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
-                    <LogOut className="h-5 w-5 text-destructive hidden group-data-[collapsible=icon]:block" />
+                    <LogOut className="h-5 w-5 text-red-600 dark:text-red-400 hidden group-data-[collapsible=icon]:block" />
                     <div className="flex flex-col items-start group-data-[collapsible=icon]:hidden">
                       <span className="font-semibold text-sm">{userName}</span>
                       <span className="text-xs text-muted-foreground">
                         Click to disconnect
                       </span>
                     </div>
-                    <LogOut className="ml-auto h-4 w-4 text-destructive group-data-[collapsible=icon]:hidden" />
+                    <LogOut className="ml-auto h-4 w-4 text-red-600 dark:text-red-400 group-data-[collapsible=icon]:hidden" />
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               </SidebarMenu>
@@ -247,17 +247,17 @@ const App = () => {
             {selectedUser ? (
               <>
                 {/* Chat Header */}
-                <header className="flex h-16 shrink-0 items-center gap-2 border-b bg-card px-4">
+                <header className="flex h-16 shrink-0 items-center gap-2 border-b bg-gradient-to-r from-white to-sky-50 dark:from-gray-900 dark:to-sky-950 px-4">
                   <SidebarTrigger />
                   <div className="flex items-center gap-3 flex-1">
                     <Avatar className="h-10 w-10">
-                      <AvatarFallback className="bg-primary text-primary-foreground font-semibold">
+                      <AvatarFallback className="bg-gradient-to-br from-sky-500 to-cyan-500 text-white font-semibold">
                         {selectedUser.charAt(0).toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
                     <div>
                       <h2 className="font-semibold text-lg">{selectedUser}</h2>
-                      <p className="text-xs text-green-600 dark:text-green-500 font-medium">
+                      <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
                         ● Online
                       </p>
                     </div>
@@ -265,7 +265,7 @@ const App = () => {
                 </header>
 
                 {/* Messages Area */}
-                <div className="flex-1 overflow-hidden bg-muted/30">
+                <div className="flex-1 overflow-hidden bg-gradient-to-b from-sky-50/50 to-cyan-50/30 dark:from-gray-900 dark:to-sky-950/30">
                   <ScrollArea className="h-full">
                     <div className="p-4 space-y-4">
                       {messages
@@ -285,10 +285,10 @@ const App = () => {
                             }`}
                           >
                             <div
-                              className={`max-w-[70%] rounded-2xl px-4 py-2.5 shadow-sm ${
+                              className={`max-w-[70%] rounded-2xl px-4 py-2.5 shadow-md ${
                                 msg.from === userName
-                                  ? "bg-primary text-primary-foreground rounded-br-sm"
-                                  : "bg-card text-card-foreground rounded-bl-sm"
+                                  ? "bg-gradient-to-br from-sky-500 to-cyan-600 text-white rounded-br-sm"
+                                  : "bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-bl-sm border border-sky-200 dark:border-sky-800"
                               }`}
                             >
                               <p className="text-sm wrap-break-word leading-relaxed">
@@ -306,7 +306,7 @@ const App = () => {
                 </div>
 
                 {/* Message Input */}
-                <div className="shrink-0 border-t bg-card p-4">
+                <div className="shrink-0 border-t bg-white dark:bg-gray-900 p-4">
                   <form
                     onSubmit={(e) => {
                       e.preventDefault();
@@ -326,7 +326,7 @@ const App = () => {
                       type="submit"
                       size="icon"
                       disabled={!messageText.trim()}
-                      className="h-11 w-11 shrink-0"
+                      className="h-11 w-11 shrink-0 bg-gradient-to-r from-sky-600 to-cyan-600 hover:from-sky-700 hover:to-cyan-700"
                     >
                       <Send className="h-4 w-4" />
                     </Button>
@@ -334,7 +334,7 @@ const App = () => {
                 </div>
               </>
             ) : (
-              <div className="flex-1 flex items-center justify-center bg-muted/30">
+              <div className="flex-1 flex items-center justify-center bg-gradient-to-b from-sky-50/50 to-cyan-50/30 dark:from-gray-900 dark:to-sky-950/30">
                 <div className="text-center text-muted-foreground space-y-4">
                   <MessageCircle className="h-24 w-24 mx-auto opacity-20" />
                   <div>
