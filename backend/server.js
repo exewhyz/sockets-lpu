@@ -1,8 +1,15 @@
 import express from "express";
 import http from "http";
 import { Server } from "socket.io";
+import dotenv from "dotenv";
+import connectDB from "./config/database.js";
+import User from "./models/User.js";
+import Message from "./models/Message.js";
 
-const PORT = 4000;
+// Load environment variables
+dotenv.config();
+
+const PORT = process.env.PORT || 4000;
 
 const app = express();
 
@@ -14,103 +21,194 @@ const io = new Server(server, {
   },
 });
 
+// Connect to MongoDB
+connectDB();
+
 // Map of online users: userName -> socketId
 const users = new Map();
-
-// Map of all users with their status: userName -> { socketId, online, lastSeen }
-const allUsers = new Map();
-
-const messages = [];
 
 io.on("connection", (socket) => {
   console.log("User connected", socket.id);
 
-  socket.on("send_message", (message) => {
-    const newMessage = {
-      id: `${Date.now()}_${Math.random()}`,
-      from: message.userName,
-      to: message.to,
-      time: new Date(Date.now()).toLocaleString(),
-      message: message.data,
-      status: 'sent', // sent, delivered, read
-    };
-    messages.push(newMessage);
-
-    // Send to recipient if online
-    const recipientSocketId = users.get(message.to);
-    if (recipientSocketId) {
-      io.to(recipientSocketId).emit("receive_message", newMessage);
-      newMessage.status = 'delivered';
-      // Notify sender about delivery
-      socket.emit("message_delivered", { messageId: newMessage.id });
-    }
-    // If recipient is offline, message stays in history and will be sent when they rejoin
-
-    // Send to sender so they see their own message
-    socket.emit("receive_message", newMessage);
-  });
-  socket.on("join", (userName) => {
-    // Check if username is taken by an online user
-    if (users.has(userName)) {
-      socket.emit("join_error", {
-        message: "Username already taken. Please choose a different name.",
+  socket.on("send_message", async (message) => {
+    try {
+      // Save message to database
+      const newMessage = await Message.create({
+        from: message.userName,
+        to: message.to,
+        message: message.data,
+        status: 'sent'
       });
-      return;
+
+      const messageData = {
+        id: newMessage._id.toString(),
+        from: newMessage.from,
+        to: newMessage.to,
+        time: new Date(newMessage.createdAt).toLocaleString(),
+        message: newMessage.message,
+        status: newMessage.status,
+      };
+
+      // Send to recipient if online
+      const recipientSocketId = users.get(message.to);
+      if (recipientSocketId) {
+        io.to(recipientSocketId).emit("receive_message", messageData);
+        // Update status to delivered
+        newMessage.status = 'delivered';
+        await newMessage.save();
+        messageData.status = 'delivered';
+        // Notify sender about delivery
+        socket.emit("message_delivered", { messageId: messageData.id });
+      }
+
+      // Send to sender so they see their own message
+      socket.emit("receive_message", messageData);
+    } catch (error) {
+      console.error("Error saving message:", error);
+      socket.emit("error", { message: "Failed to send message" });
     }
+  });
+  
+  socket.on("join", async ({ userName, password }) => {
+    try {
+      // Validate input
+      if (!userName || !password) {
+        socket.emit("join_error", {
+          message: "Username and password are required.",
+        });
+        return;
+      }
 
-    // Register user as online
-    users.set(userName, socket.id);
-    allUsers.set(userName, {
-      socketId: socket.id,
-      online: true,
-      lastSeen: null,
-    });
-    socket.userName = userName;
+      // Find user in database
+      let user = await User.findOne({ name: userName });
+      
+      if (user) {
+        // Check if user has no password (created before password feature)
+        if (!user.password) {
+          // Update old user with new password
+          user.password = password;
+          user.socketId = socket.id;
+          user.online = true;
+          user.lastSeen = new Date();
+          await user.save();
+        } else {
+          // Existing user with password - verify it
+          const isPasswordValid = await user.comparePassword(password);
+          
+          if (!isPasswordValid) {
+            socket.emit("join_error", {
+              message: "Incorrect password.",
+            });
+            return;
+          }
+          
+          // Check if user is already online (in another session)
+          if (user.online && users.has(userName)) {
+            socket.emit("join_error", {
+              message: "This account is already logged in from another device.",
+            });
+            return;
+          }
+          
+          // Update existing user (successful login)
+          user.socketId = socket.id;
+          user.online = true;
+          user.lastSeen = new Date();
+          await user.save();
+        }
+      } else {
+        // New user - create account
+        user = await User.create({
+          name: userName,
+          password: password,
+          socketId: socket.id,
+          online: true,
+          lastSeen: new Date()
+        });
+      }
 
-    socket.emit("join_success");
-    
-    // Send full user list with status
-    const userList = Array.from(allUsers.entries()).map(([name, data]) => ({
-      name,
-      online: data.online,
-      lastSeen: data.lastSeen,
-    }));
-    io.emit("users", userList);
-    
-    // Send message history (includes all messages, even those received while offline)
-    socket.emit("message_history", messages);
-    
-    // Mark undelivered messages as delivered
-    messages.forEach((msg) => {
-      if (msg.to === userName && msg.status === 'sent') {
+      users.set(userName, socket.id);
+      socket.userName = userName;
+
+      socket.emit("join_success");
+      
+      // Get all users from database
+      const allUsers = await User.find({}).lean();
+      const userList = allUsers.map((u) => ({
+        name: u.name,
+        online: u.online,
+        lastSeen: u.lastSeen,
+      }));
+      
+      io.emit("users", userList);
+      
+      // Get message history
+      const messageHistory = await Message.find({
+        $or: [
+          { from: userName },
+          { to: userName }
+        ]
+      })
+        .sort({ createdAt: 1 })
+        .lean();
+
+      const formattedMessages = messageHistory.map((msg) => ({
+        id: msg._id.toString(),
+        from: msg.from,
+        to: msg.to,
+        time: new Date(msg.createdAt).toLocaleString(),
+        message: msg.message,
+        status: msg.status,
+      }));
+
+      socket.emit("message_history", formattedMessages);
+      
+      // Mark undelivered messages as delivered
+      const undeliveredMessages = await Message.find({
+        to: userName,
+        status: 'sent'
+      });
+      
+      for (const msg of undeliveredMessages) {
         msg.status = 'delivered';
+        await msg.save();
+        
         // Notify original sender
         const senderSocketId = users.get(msg.from);
         if (senderSocketId) {
-          io.to(senderSocketId).emit("message_delivered", { messageId: msg.id });
+          io.to(senderSocketId).emit("message_delivered", { messageId: msg._id.toString() });
         }
       }
-    });
+    } catch (error) {
+      console.error("Error in join event:", error);
+      socket.emit("join_error", { message: "Failed to join chat" });
+    }
   });
 
-  socket.on("messages_read", ({ from, to }) => {
-    // Mark messages as read
-    const updatedMessages = messages.filter(
-      (msg) => msg.from === from && msg.to === to && msg.status !== 'read'
-    );
-    
-    updatedMessages.forEach((msg) => {
-      msg.status = 'read';
-    });
-    
-    // Notify the sender
-    const senderSocketId = users.get(from);
-    if (senderSocketId && updatedMessages.length > 0) {
-      io.to(senderSocketId).emit("messages_read", {
-        from,
-        to,
-        messageIds: updatedMessages.map(m => m.id)
-      });
+  socket.on("messages_read", async ({ from, to }) => {
+    try {
+      // Update message status to read
+      const result = await Message.updateMany(
+        { from, to, status: { $ne: 'read' } },
+        { status: 'read' }
+      );
+
+      if (result.modifiedCount > 0) {
+        // Get updated message IDs
+        const updatedMessages = await Message.find(
+          { from, to, status: 'read' }
+        ).select('_id').lean();
+        
+        const messageIds = updatedMessages.map(m => m._id.toString());
+        
+        // Notify sender that messages were read
+        const senderSocketId = users.get(from);
+        if (senderSocketId) {
+          io.to(senderSocketId).emit("messages_read", { messageIds });
+        }
+      }
+    } catch (error) {
+      console.error("Error marking messages as read:", error);
     }
   });
 
@@ -128,59 +226,80 @@ io.on("connection", (socket) => {
     }
   });
 
-  socket.on("leave", () => {
+  socket.on("leave", async () => {
     if (socket.userName) {
-      users.delete(socket.userName);
-      console.log("User left:", socket.userName);
-      
-      // Mark user as offline
-      if (allUsers.has(socket.userName)) {
-        allUsers.set(socket.userName, {
-          socketId: null,
-          online: false,
-          lastSeen: new Date().toISOString(),
-        });
+      try {
+        users.delete(socket.userName);
+        console.log("User left:", socket.userName);
+        
+        // Update user status in database
+        await User.findOneAndUpdate(
+          { name: socket.userName },
+          {
+            online: false,
+            lastSeen: new Date(),
+            socketId: null
+          }
+        );
+        
+        // Send updated user list
+        const allUsers = await User.find({}).lean();
+        const userList = allUsers.map((u) => ({
+          name: u.name,
+          online: u.online,
+          lastSeen: u.lastSeen,
+        }));
+        io.emit("users", userList);
+        
+        socket.userName = null;
+      } catch (error) {
+        console.error("Error in leave event:", error);
       }
-      
-      // Send updated user list
-      const userList = Array.from(allUsers.entries()).map(([name, data]) => ({
-        name,
-        online: data.online,
-        lastSeen: data.lastSeen,
-      }));
-      io.emit("users", userList);
-      
-      socket.userName = null;
     }
   });
 
-  socket.on("disconnect", () => {
+  socket.on("disconnect", async () => {
     if (socket.userName) {
-      users.delete(socket.userName);
-      console.log("User disconnected:", socket.userName);
-      
-      // Mark user as offline
-      if (allUsers.has(socket.userName)) {
-        allUsers.set(socket.userName, {
-          socketId: null,
-          online: false,
-          lastSeen: new Date().toISOString(),
-        });
+      try {
+        users.delete(socket.userName);
+        console.log("User disconnected:", socket.userName);
+        
+        // Update user status in database
+        await User.findOneAndUpdate(
+          { name: socket.userName },
+          {
+            online: false,
+            lastSeen: new Date(),
+            socketId: null
+          }
+        );
+        
+        // Send updated user list
+        const allUsers = await User.find({}).lean();
+        const userList = allUsers.map((u) => ({
+          name: u.name,
+          online: u.online,
+          lastSeen: u.lastSeen,
+        }));
+        io.emit("users", userList);
+      } catch (error) {
+        console.error("Error in disconnect event:", error);
       }
-      
-      // Send updated user list
-      const userList = Array.from(allUsers.entries()).map(([name, data]) => ({
-        name,
-        online: data.online,
-        lastSeen: data.lastSeen,
-      }));
-      io.emit("users", userList);
     }
   });
 });
 
 app.get("/", (req, res) => {
-  res.send("<h1>Hello world</h1>");
+  res.send("<h1>Chat App Backend with MongoDB</h1>");
+});
+
+// Health check endpoint
+app.get("/health", async (req, res) => {
+  const mongoose = (await import('mongoose')).default;
+  res.json({ 
+    status: "ok", 
+    mongodb: mongoose.connection.readyState === 1 ? "connected" : "disconnected" 
+  });
 });
 
 server.listen(PORT, () =>

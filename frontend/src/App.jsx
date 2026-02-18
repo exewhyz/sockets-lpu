@@ -45,6 +45,7 @@ const App = () => {
   const [users, setUsers] = useState([]);
   const [isConnected, setIsConnected] = useState(false);
   const [userName, setUserName] = useState("");
+  const [password, setPassword] = useState("");
   const [selectedUser, setSelectedUser] = useState("");
   const [messageText, setMessageText] = useState("");
   const [showDisconnectDialog, setShowDisconnectDialog] = useState(false);
@@ -147,7 +148,7 @@ const App = () => {
     });
     socket.on("join_error", (error) => {
       alert(error.message);
-      setUserName("");
+      setPassword("");
       socket.disconnect();
     });
     socket.on("typing", ({ from }) => {
@@ -209,14 +210,14 @@ const App = () => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!userName) return;
+    if (!userName || !password) return;
 
     // Reconnect socket if it was disconnected
     if (!socket.connected) {
       socket.connect();
     }
 
-    socket.emit("join", userName);
+    socket.emit("join", { userName, password });
   };
 
   const handleKeyPress = (e) => {
@@ -265,6 +266,7 @@ const App = () => {
     socket.disconnect();
     setIsConnected(false);
     setUserName("");
+    setPassword("");
     setSelectedUser("");
     setMessages([]);
     setUsers([]);
@@ -285,7 +287,7 @@ const App = () => {
                 Welcome to Chat App
               </CardTitle>
               <CardDescription className="text-base">
-                Enter your name to start chatting with others
+                Login or create a new account to start chatting
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -295,7 +297,18 @@ const App = () => {
                     type="text"
                     value={userName}
                     onChange={(e) => setUserName(e.target.value)}
-                    placeholder="Your name"
+                    placeholder="Username"
+                    minLength={3}
+                    required
+                    className="h-12 text-base"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Password"
                     minLength={3}
                     required
                     className="h-12 text-base"
@@ -306,7 +319,7 @@ const App = () => {
                   className="w-full h-12 text-base"
                   size="lg"
                 >
-                  Join Chat
+                  Login / Sign Up
                 </Button>
               </form>
             </CardContent>
