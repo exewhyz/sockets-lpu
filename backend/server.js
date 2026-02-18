@@ -14,6 +14,7 @@ const io = new Server(server, {
   },
 });
 const users = new Map();
+const messages = [];
 
 io.on("connection", (socket) => {
   console.log("User connected", socket.id);
@@ -21,17 +22,32 @@ io.on("connection", (socket) => {
   socket.on("send_message", (message) => {
     const newMessage = {
       from : message.userName,
+      to: message.to,
       time: new Date(Date.now()).toLocaleString(),
       message : message.data
     }
-    io.to(socket.id).emit("receive_message", newMessage);
+    messages.push(newMessage);
+    
+    // Send to recipient
+    const recipientSocketId = users.get(message.to);
+    if (recipientSocketId) {
+      io.to(recipientSocketId).emit("receive_message", newMessage);
+    }
+    
+    // Send to sender so they see their own message
+    socket.emit("receive_message", newMessage);
   });
   socket.on("join", (userName) => {
     users.set(userName, socket.id);
+    socket.userName = userName;
     io.emit("users", Array.from(users.keys()));
+    socket.emit("message_history", messages);
   });
   socket.on("disconnect", () => {
-    users.delete(socket.id);
+    if (socket.userName) {
+      users.delete(socket.userName);
+      console.log("User disconnected:", socket.userName);
+    }
     io.emit("users", Array.from(users.keys()));
   })
 });
