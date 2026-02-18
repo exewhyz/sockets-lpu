@@ -1,6 +1,33 @@
 import socket from "./utils/socket";
 import { useState, useEffect, useRef } from "react";
-import "./App.css";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Badge } from "@/components/ui/badge";
+import { Send, MessageCircle, Menu } from "lucide-react";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarProvider,
+  SidebarInset,
+  SidebarTrigger,
+  SidebarRail,
+} from "@/components/ui/sidebar";
 
 const App = () => {
   const SEND_MESSAGE = "send_message";
@@ -42,13 +69,12 @@ const App = () => {
       socket.off("users");
       socket.off("message_history");
       socket.off("connect");
-    }
-
+    };
   }, []);
 
   const sendMessage = () => {
     if (!messageText.trim() || !selectedUser) return;
-    
+
     socket.emit(SEND_MESSAGE, {
       userName,
       to: selectedUser,
@@ -64,118 +90,229 @@ const App = () => {
     setIsConnected(true);
   };
 
+  const handleKeyPress = (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  };
+
   return (
-    <div className="app-container">
+    <div className="h-screen w-screen overflow-hidden bg-linear-to-br from-primary/20 via-primary/10 to-accent/20">
       {!isConnected ? (
-        <div className="login-container">
-          <div className="login-card">
-            <h1>💬 Chat App</h1>
-            <p>Enter your name to start chatting</p>
-            <form onSubmit={handleSubmit}>
-              <input
-                type="text"
-                value={userName}
-                onChange={(e) => setUserName(e.target.value)}
-                placeholder="Your name"
-                minLength={3}
-                required
-                className="login-input"
-              />
-              <button type="submit" className="login-button">Join Chat</button>
-            </form>
-          </div>
+        <div className="flex items-center justify-center h-full w-full p-4">
+          <Card className="w-full max-w-md shadow-2xl">
+            <CardHeader className="text-center space-y-2">
+              <div className="flex justify-center mb-2">
+                <MessageCircle className="h-16 w-16 text-primary" />
+              </div>
+              <CardTitle className="text-3xl font-bold">
+                Welcome to Chat App
+              </CardTitle>
+              <CardDescription className="text-base">
+                Enter your name to start chatting with others
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="space-y-2">
+                  <Input
+                    type="text"
+                    value={userName}
+                    onChange={(e) => setUserName(e.target.value)}
+                    placeholder="Your name"
+                    minLength={3}
+                    required
+                    className="h-12 text-base"
+                  />
+                </div>
+                <Button
+                  type="submit"
+                  className="w-full h-12 text-base"
+                  size="lg"
+                >
+                  Join Chat
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
         </div>
       ) : (
-        <div className="chat-container">
-          <div className="sidebar">
-            <div className="sidebar-header">
-              <h2>💬 Chats</h2>
-              <div className="current-user">
-                <span className="user-badge">{userName}</span>
+        <SidebarProvider defaultOpen={true}>
+          {/* <div className="flex h-full w-full bg-background"> */}
+          {/* Sidebar */}
+          <Sidebar collapsible="icon" variant="inset" className="border-r">
+            <SidebarHeader className="border-b bg-primary text-primary-foreground">
+              <div className="flex items-center justify-between px-2 py-2">
+                <div className="flex items-center gap-2">
+                  <MessageCircle className="h-5 w-5" />
+                  <span className="font-semibold text-lg group-data-[collapsible=icon]:hidden">
+                    Chats
+                  </span>
+                </div>
+                <Badge
+                  variant="secondary"
+                  className="bg-primary-foreground/20 text-primary-foreground hover:bg-primary-foreground/30 group-data-[collapsible=icon]:hidden"
+                >
+                  {userName}
+                </Badge>
               </div>
-            </div>
-            <div className="users-list">
-              {users.filter(u => u !== userName).length === 0 ? (
-                <div className="no-users">No other users online</div>
-              ) : (
-                users.filter(u => u !== userName).map((user) => (
-                  <div 
-                    key={user}
-                    className={`user-item ${selectedUser === user ? 'active' : ''}`}
-                    onClick={() => setSelectedUser(user)}
-                  >
-                    <div className="user-avatar">{user.charAt(0).toUpperCase()}</div>
-                    <div className="user-info">
-                      <div className="user-name">{user}</div>
-                      <div className="user-status">Online</div>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
+            </SidebarHeader>
+            <SidebarContent>
+              <SidebarGroup>
+                <SidebarGroupLabel className="group-data-[collapsible=icon]:hidden">
+                  Online Users
+                </SidebarGroupLabel>
+                <SidebarGroupContent>
+                  <SidebarMenu>
+                    {users.filter((u) => u !== userName).length === 0 ? (
+                      <div className="p-4 text-center text-muted-foreground text-sm group-data-[collapsible=icon]:hidden">
+                        No other users online
+                      </div>
+                    ) : (
+                      users
+                        .filter((u) => u !== userName)
+                        .map((user) => (
+                          <SidebarMenuItem key={user}>
+                            <SidebarMenuButton
+                              onClick={() => setSelectedUser(user)}
+                              isActive={selectedUser === user}
+                              className="h-auto py-3 group-data-[collapsible=icon]:justify-center"
+                              tooltip={user}
+                            >
+                              <Avatar className="h-9 w-9 shrink-0">
+                                <AvatarFallback className="bg-primary text-primary-foreground font-semibold text-sm">
+                                  {user.charAt(0).toUpperCase()}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div className="flex flex-col items-start group-data-[collapsible=icon]:hidden">
+                                <span className="font-semibold text-sm">
+                                  {user}
+                                </span>
+                                <span className="text-xs text-green-600 dark:text-green-500">
+                                  ● Online
+                                </span>
+                              </div>
+                            </SidebarMenuButton>
+                          </SidebarMenuItem>
+                        ))
+                    )}
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </SidebarGroup>
+            </SidebarContent>
+            <SidebarRail />
+          </Sidebar>
 
-          <div className="chat-area">
+          {/* Main Chat Area */}
+          <SidebarInset className="flex flex-col h-screen overflow-hidden">
             {selectedUser ? (
               <>
-                <div className="chat-header">
-                  <div className="chat-header-user">
-                    <div className="user-avatar">{selectedUser.charAt(0).toUpperCase()}</div>
+                {/* Chat Header */}
+                <header className="flex h-16 shrink-0 items-center gap-2 border-b bg-card px-4">
+                  <SidebarTrigger />
+                  <div className="flex items-center gap-3 flex-1">
+                    <Avatar className="h-10 w-10">
+                      <AvatarFallback className="bg-primary text-primary-foreground font-semibold">
+                        {selectedUser.charAt(0).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
                     <div>
-                      <div className="chat-title">{selectedUser}</div>
-                      <div className="chat-status">Online</div>
+                      <h2 className="font-semibold text-lg">{selectedUser}</h2>
+                      <p className="text-xs text-green-600 dark:text-green-500 font-medium">
+                        ● Online
+                      </p>
                     </div>
                   </div>
+                </header>
+
+                {/* Messages Area */}
+                <div className="flex-1 overflow-hidden bg-muted/30">
+                  <ScrollArea className="h-full">
+                    <div className="p-4 space-y-4">
+                      {messages
+                        .filter(
+                          (msg) =>
+                            (msg.from === userName &&
+                              msg.to === selectedUser) ||
+                            (msg.from === selectedUser && msg.to === userName),
+                        )
+                        .map((msg, idx) => (
+                          <div
+                            key={idx}
+                            className={`flex animate-in slide-in-from-bottom-2 duration-300 ${
+                              msg.from === userName
+                                ? "justify-end"
+                                : "justify-start"
+                            }`}
+                          >
+                            <div
+                              className={`max-w-[70%] rounded-2xl px-4 py-2.5 shadow-sm ${
+                                msg.from === userName
+                                  ? "bg-primary text-primary-foreground rounded-br-sm"
+                                  : "bg-card text-card-foreground rounded-bl-sm"
+                              }`}
+                            >
+                              <p className="text-sm wrap-break-word leading-relaxed">
+                                {msg.message}
+                              </p>
+                              <p className="text-[0.65rem] opacity-70 mt-1 text-right">
+                                {msg.time}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      <div ref={messagesEndRef} />
+                    </div>
+                  </ScrollArea>
                 </div>
 
-                <div className="messages-container">
-                  {messages
-                    .filter(msg => 
-                      (msg.from === userName && msg.to === selectedUser) ||
-                      (msg.from === selectedUser && msg.to === userName)
-                    )
-                    .map((msg, idx) => (
-                      <div 
-                        key={idx} 
-                        className={`message ${msg.from === userName ? 'sent' : 'received'}`}
-                      >
-                        <div className="message-bubble">
-                          <div className="message-text">{msg.message}</div>
-                          <div className="message-time">{msg.time}</div>
-                        </div>
-                      </div>
-                    ))}
-                  <div ref={messagesEndRef} />
-                </div>
-
-                <div className="message-input-container">
-                  <input
-                    type="text"
-                    value={messageText}
-                    onChange={(e) => setMessageText(e.target.value)}
-                    placeholder={`Message ${selectedUser}...`}
-                    onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage()}
-                    className="message-input"
-                  />
-                  <button 
-                    onClick={sendMessage} 
-                    disabled={!messageText.trim()}
-                    className="send-button"
+                {/* Message Input */}
+                <div className="shrink-0 border-t bg-card p-4">
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      sendMessage();
+                    }}
+                    className="flex gap-2"
                   >
-                    📤
-                  </button>
+                    <Input
+                      type="text"
+                      value={messageText}
+                      onChange={(e) => setMessageText(e.target.value)}
+                      placeholder={`Message ${selectedUser}...`}
+                      onKeyDown={handleKeyPress}
+                      className="flex-1 h-11"
+                    />
+                    <Button
+                      type="submit"
+                      size="icon"
+                      disabled={!messageText.trim()}
+                      className="h-11 w-11 shrink-0"
+                    >
+                      <Send className="h-4 w-4" />
+                    </Button>
+                  </form>
                 </div>
               </>
             ) : (
-              <div className="no-chat-selected">
-                <div className="no-chat-content">
-                  <h2>💬</h2>
-                  <p>Select a user to start chatting</p>
+              <div className="flex-1 flex items-center justify-center bg-muted/30">
+                <div className="text-center text-muted-foreground space-y-4">
+                  <MessageCircle className="h-24 w-24 mx-auto opacity-20" />
+                  <div>
+                    <h3 className="text-xl font-semibold mb-2">
+                      No Conversation Selected
+                    </h3>
+                    <p className="text-sm">
+                      Select a user from the sidebar to start chatting
+                    </p>
+                  </div>
                 </div>
               </div>
             )}
-          </div>
-        </div>
+          </SidebarInset>
+          {/* </div> */}
+        </SidebarProvider>
       )}
     </div>
   );
