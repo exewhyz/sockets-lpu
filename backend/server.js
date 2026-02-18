@@ -38,8 +38,15 @@ io.on("connection", (socket) => {
     socket.emit("receive_message", newMessage);
   });
   socket.on("join", (userName) => {
+    // Check if username already exists
+    if (users.has(userName)) {
+      socket.emit("join_error", { message: "Username already taken. Please choose a different name." });
+      return;
+    }
+    
     users.set(userName, socket.id);
     socket.userName = userName;
+    socket.emit("join_success");
     io.emit("users", Array.from(users.keys()));
     socket.emit("message_history", messages);
   });

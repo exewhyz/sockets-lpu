@@ -78,12 +78,22 @@ const App = () => {
     socket.on("connect", () => {
       console.log("Socket connected:", socket.id);
     });
+    socket.on("join_success", () => {
+      setIsConnected(true);
+    });
+    socket.on("join_error", (error) => {
+      alert(error.message);
+      setUserName("");
+      socket.disconnect();
+    });
 
     return () => {
       socket.off("receive_message");
       socket.off("users");
       socket.off("message_history");
       socket.off("connect");
+      socket.off("join_success");
+      socket.off("join_error");
     };
   }, []);
 
@@ -108,7 +118,6 @@ const App = () => {
     }
 
     socket.emit("join", userName);
-    setIsConnected(true);
   };
 
   const handleKeyPress = (e) => {
