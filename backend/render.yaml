@@ -6,8 +6,8 @@ services:
     buildCommand: npm install
     startCommand: npm start
     envVars:
-      - key: PORT
-        value: 4000
       - key: MONGODB_URI
         sync: false
+      - key: FRONTEND_URL
+        value: https://locker-room-frontend.vercel.app
     healthCheckPath: /health

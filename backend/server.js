@@ -1,6 +1,7 @@
 import express from "express";
 import http from "http";
 import { Server } from "socket.io";
+import cors from "cors";
 import dotenv from "dotenv";
 import connectDB from "./config/database.js";
 import User from "./models/User.js";
@@ -13,11 +14,19 @@ const PORT = process.env.PORT || 4000;
 
 const app = express();
 
+// Middleware
+app.use(cors({
+  origin: process.env.FRONTEND_URL || "*",
+  methods: ["GET", "POST"],
+  credentials: true,
+}));
+app.use(express.json());
+
 const server = http.createServer(app);
 
 const io = new Server(server, {
   cors: {
-    origin: "*",
+    origin: process.env.FRONTEND_URL || "*",
     methods: ["GET", "POST"],
     credentials: true,
   },
@@ -303,5 +312,5 @@ app.get("/health", async (req, res) => {
 
 server.listen(PORT, async () => {
   await connectDB();
-  console.log(`Server listening on  http://localhost:${PORT}`);
+  console.log(`Server listening on port ${PORT}`);
 });
